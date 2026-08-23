@@ -1,0 +1,422 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Hospital Patient Flow Management System - MVP Infrastructure
+
+# Global settings applied to all resources
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: nodejs18.x
+    Environment:
+      Variables:
+        ENCOUNTERS_TABLE: !Ref EncountersTable
+        EVENTS_TABLE: !Ref EventsTable
+        AUDIT_TABLE: !Ref AuditEventsTable
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment environment
+
+Resources:
+  # ============================================================================
+  # DynamoDB TABLES
+  # ============================================================================
+
+  # Main encounters table
+  EncountersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'hospital-queue-encounters-${Environment}'
+      BillingMode: PAY_PER_REQUEST  # Auto-scaling, pay for what you use
+      AttributeDefinitions:
+        # Primary Key
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        # GSI1: For querying patients by status
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        # Partition Key: DEPT#GOPD#DATE#2026-08-19
+        # Sort Key: PATIENT#<patientId>
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES  # For future DynamoDB Streams
+      Tags:
+        - Key: Application
+          Value: HospitalQueue
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Events table (append-only log for sync)
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'hospital-queue-events-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: encounterId
+          AttributeType: S
+        - AttributeName: syncStatus
+          AttributeType: S
+        - AttributeName: createdAtDevice
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        # Query: Get all events for an encounter
+        - IndexName: EncounterIdIndex
+          KeySchema:
+            - AttributeName: encounterId
+              KeyType: HASH
+            - AttributeName: createdAtDevice
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Query: Get all PENDING events (for sync)
+        - IndexName: SyncStatusIndex
+          KeySchema:
+            - AttributeName: syncStatus
+              KeyType: HASH
+            - AttributeName: createdAtDevice
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true  # Events auto-delete after 90 days
+      Tags:
+        - Key: Application
+          Value: HospitalQueue
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Audit trail table (immutable log for compliance)
+  AuditEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'hospital-queue-audit-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: auditId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: encounterId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: auditId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        # Query: Get all audits for an encounter
+        - IndexName: EncounterAuditIndex
+          KeySchema:
+            - AttributeName: encounterId
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Application
+          Value: HospitalQueue
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ============================================================================
+  # LAMBDA FUNCTIONS
+  # ============================================================================
+
+  # Check-in endpoint: POST /checkin
+  CheckInFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-checkin-${Environment}'
+      CodeUri: backend/lambdas/checkin/
+      Handler: index.handler
+      Description: Handle patient check-in
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EncountersTable
+      Events:
+        CheckInAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /checkin
+            Method: POST
+
+  # Get queue endpoint: GET /queue/{dept}
+  GetQueueFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-get-queue-${Environment}'
+      CodeUri: backend/lambdas/get-queue/
+      Handler: index.handler
+      Description: Get live queue for a department
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EncountersTable
+      Events:
+        GetQueueAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /queue/{dept}
+            Method: GET
+
+  # Get patient status endpoint: GET /patients/{id}
+  GetPatientFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-get-patient-${Environment}'
+      CodeUri: backend/lambdas/get-patient/
+      Handler: index.handler
+      Description: Get patient's current status
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EncountersTable
+      Events:
+        GetPatientAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /patients/{id}
+            Method: GET
+
+  # Call next endpoint: POST /queue/{dept}/call-next
+  CallNextFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-call-next-${Environment}'
+      CodeUri: backend/lambdas/call-next/
+      Handler: index.handler
+      Description: Call next patient in queue
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EncountersTable
+      Events:
+        CallNextAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /queue/{dept}/call-next
+            Method: POST
+
+  # Update patient status endpoint: PATCH /patients/{id}/status
+  UpdatePatientStatusFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-update-status-${Environment}'
+      CodeUri: backend/lambdas/update-status/
+      Handler: index.handler
+      Description: Update patient status (verified, paid, completed, etc.)
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EncountersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AuditEventsTable
+      Events:
+        UpdateStatusAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /patients/{id}/status
+            Method: PATCH
+
+  # Sync events endpoint: POST /sync/events
+  SyncEventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'hospital-queue-sync-events-${Environment}'
+      CodeUri: backend/lambdas/sync-events/
+      Handler: index.handler
+      Description: Process offline sync events from devices
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EncountersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AuditEventsTable
+      Events:
+        SyncAPI:
+          Type: Api
+          Properties:
+            RestApiId: !Ref HospitalQueueAPI
+            Path: /sync/events
+            Method: POST
+
+  # ============================================================================
+  # API GATEWAY
+  # ============================================================================
+
+  HospitalQueueAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub 'hospital-queue-api-${Environment}'
+      StageName: !Ref Environment
+      TracingEnabled: true
+      MethodSettings:
+        - ResourcePath: '/**'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+          LoggingLevel: INFO
+          DataTraceEnabled: true
+      Cors:
+        AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"  # In prod, restrict this to your domain
+
+  # ============================================================================
+  # S3 + CLOUDFRONT (Frontend hosting)
+  # ============================================================================
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'hospital-queue-frontend-${Environment}-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Application
+          Value: HospitalQueue
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudFront distribution for frontend
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          DefaultTTL: 300  # 5 minutes
+          MaxTTL: 3600    # 1 hour
+        # Custom error responses (SPA routing)
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+
+  # CloudFront origin access identity
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'OAI for Hospital Queue Frontend ${Environment}'
+
+  # S3 bucket policy to allow CloudFront access
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyText:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${CloudFrontOAI}'
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+
+  # ============================================================================
+  # OUTPUTS (for easy reference)
+  # ============================================================================
+
+Outputs:
+  EncountersTableName:
+    Description: DynamoDB Encounters Table Name
+    Value: !Ref EncountersTable
+    Export:
+      Name: !Sub 'HospitalQueue-EncountersTable-${Environment}'
+
+  EventsTableName:
+    Description: DynamoDB Events Table Name
+    Value: !Ref EventsTable
+    Export:
+      Name: !Sub 'HospitalQueue-EventsTable-${Environment}'
+
+  AuditTableName:
+    Description: DynamoDB Audit Table Name
+    Value: !Ref AuditEventsTable
+    Export:
+      Name: !Sub 'HospitalQueue-AuditTable-${Environment}'
+
+  APIEndpoint:
+    Description: API Gateway endpoint
+    Value: !Sub 'https://${HospitalQueueAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub 'HospitalQueue-APIEndpoint-${Environment}'
+
+  FrontendBucketName:
+    Description: S3 Frontend Bucket Name
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub 'HospitalQueue-FrontendBucket-${Environment}'
+
+  FrontendURL:
+    Description: CloudFront Frontend URL
+    Value: !Sub 'https://${FrontendDistribution.DomainName}'
+    Export:
+      Name: !Sub 'HospitalQueue-FrontendURL-${Environment}'
+
+  CheckInFunctionArn:
+    Description: Check-in Lambda Function ARN
+    Value: !GetAtt CheckInFunction.Arn
+
+  CallNextFunctionArn:
+    Description: Call-next Lambda Function ARN
+    Value: !GetAtt CallNextFunction.Arn
+
+  SyncEventsFunctionArn:
+    Description: Sync Events Lambda Function ARN
+    Value: !GetAtt SyncEventsFunction.Arn
