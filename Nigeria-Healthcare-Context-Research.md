@@ -1,4 +1,4 @@
-# Nigeria Healthcare Systems — Context & Research for Hospital Queue MVP
+# Nigeria Healthcare Systems — Context & Research for pulseflow MVP
 
 **Purpose**: Reference guide for realistic Nigerian GOPD workflows, NHIA/HMO operations, and regulatory requirements.  
 **Audience**: Portfolio project, interviews, hospital discovery conversations.  
@@ -53,6 +53,7 @@ From research on Nigerian public hospitals (Abuja, Lagos, Ibadan), a typical GOP
 ### What NHIA is
 
 NHIA is Nigeria's national health-insurance framework. It operates as a universal health-coverage scheme with:
+
 - State Health Insurance Schemes (SHISs) at state level
 - Healthcare providers (public and private hospitals)
 - HMOs (Health Maintenance Organizations) as intermediaries
@@ -73,12 +74,14 @@ NHIA is Nigeria's national health-insurance framework. It operates as a universa
 **In theory**: Hospital calls NHIA's verification hotline or logs into a portal to confirm eligibility in real-time.
 
 **In practice** (especially in public hospitals):
+
 - Staff looks up the NHIA card number in a printed list or handbook
 - Staff calls a phone number to verify (slow, unreliable)
 - Staff assumes the card is valid if it looks genuine (risky)
 - No real-time API integration due to connectivity, system unavailability, or lack of IT infrastructure
 
 **For your MVP**: Treat verification as a **manual staff action** with fields:
+
 ```
 verificationMode: "MANUAL_MVP"
 verificationStatus: PENDING | VERIFIED | FAILED
@@ -93,18 +96,21 @@ Do not pretend to call an NHIA API; be explicit that you are modeling the manual
 ### Benefit packages and coverage
 
 NHIA offers multiple benefit packages depending on enrollment programme:
+
 - **Essential Health Services**: Basic primary care, maternal health, child health
 - **Senior Citizen Programme**: Free healthcare for ages 65+
 - **Vulnerable Group Programme**: Care for pregnant women, children under 5
 - **Formal Sector Workers**: Through employer contributions
 
 Services may be **excluded** based on package:
+
 - Specialist services (may require referral + pre-approval)
 - Imaging or laboratory (may be limited or excluded)
 - Pharmacy charges (may be co-payment)
 - Elective procedures
 
 Your system should record:
+
 ```
 coveragePackage: "<PACKAGE_NAME>"
 benefitStatus: COVERED | EXCLUDED | REQUIRES_APPROVAL | PARTIAL_COVERAGE
@@ -114,6 +120,7 @@ copaymentAmount: "<AMOUNT_IF_APPLICABLE>"
 ### Co-payments and restrictions
 
 Some NHIA programmes include co-payments (patient pays a small amount; NHIA covers the rest). Your system should track:
+
 - Whether co-payment is required
 - Amount due
 - Whether payment has been collected
@@ -125,12 +132,14 @@ Some NHIA programmes include co-payments (patient pays a small amount; NHIA cove
 ### What HMOs are
 
 HMOs are private health insurance intermediaries. They:
+
 - Negotiate contracts with hospitals and clinics
 - Enroll employees and individuals under various plans
 - Process benefit verification and pre-authorization
 - Handle claims submission and payment to hospitals
 
 Common HMOs in Nigeria:
+
 - ALIKO Dangote
 - Hygeia
 - NSIA
@@ -154,12 +163,14 @@ Common HMOs in Nigeria:
 ### HMO verification in practice
 
 Like NHIA, HMO verification is often **manual**:
+
 - Staff calls the HMO's customer service line
 - Waits on hold (unreliable, slow)
 - Manually records the approval code
 - No real-time system integration in many public hospitals
 
 **For your MVP**:
+
 ```
 hmoName: "<HMO_NAME>"
 memberNumber: "<MEMBER_ID>"
@@ -196,11 +207,13 @@ verifiedAt: "<TIMESTAMP>"
 ### Cash workflow in GOPD
 
 **Before consultation** (most common in public hospitals):
+
 ```
 Check-in → Registration fee collected → Verification (if NHIA/HMO) → Payment for consultation → Consultation → Pharmacy/discharge
 ```
 
 **After consultation** (less common):
+
 ```
 Check-in → Consultation → Billing and payment → Pharmacy/discharge
 ```
@@ -230,6 +243,7 @@ Do not skip receipt tracking; it's essential for hospital accounting and patient
 ### How emergency is handled in Nigerian GOPDs
 
 Emergency cases are typically identified by:
+
 - **Appearance**: Patient is visibly unwell, bleeding, unconscious, or in distress
 - **Chief complaint**: Life-threatening symptoms (chest pain, difficulty breathing, severe trauma)
 - **Staff escalation**: Reception staff flags as urgent; clinical staff confirms via triage
@@ -250,6 +264,7 @@ Arrival
 **Emergency is a clinical decision, not a patient choice.** A patient may claim urgency, but triage staff determines whether true emergency exists.
 
 Your system should:
+
 1. Allow reception staff to flag urgency at check-in
 2. Require clinical staff to **confirm** via triage (within 5–10 minutes)
 3. Only move patient to emergency priority after clinical confirmation
@@ -299,6 +314,7 @@ For healthcare systems, it requires:
 ### What NOT to store
 
 Do not store:
+
 - **National Identification Number (NIN)** unless the hospital requires it for other operational reasons (not for queue management alone)
 - **Clinical diagnosis or medical history**
 - **Prescription or medication information**
@@ -331,6 +347,7 @@ The **National Health Act** (enacted ~2014, ongoing implementation) contains con
 ### Typical GOPD caseload
 
 A single GOPD in a public hospital might see:
+
 - **Morning (7 AM–12 PM)**: 80–120 patients
 - **Afternoon (1 PM–5 PM)**: 40–60 patients
 - **Total**: 120–180 patients/day
@@ -348,6 +365,7 @@ A single GOPD in a public hospital might see:
 ### Queue depth at any given time
 
 If 200 patients check in over an 8-hour day (25/hour) and average consultation time is 15 min:
+
 - At peak (morning), might have 40–60 patients in queue
 - In afternoon, might have 20–30 in queue
 
