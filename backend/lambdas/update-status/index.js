@@ -3,11 +3,12 @@ const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TABLE = process.env.ENCOUNTERS_TABLE;
 
+// These must match what check-in Lambda sets!
 const PATHWAYS = {
-  NHIA: ['CHECKED_IN', 'VERIFICATION', 'CONSULTATION', 'COMPLETED'],
-  HMO: ['CHECKED_IN', 'VERIFICATION', 'CONSULTATION', 'COMPLETED'],
-  CASH: ['CHECKED_IN', 'REGISTRATION', 'CONSULTATION', 'COMPLETED'],
-  EMERGENCY: ['CHECKED_IN', 'TRIAGE', 'CONSULTATION', 'COMPLETED']
+  NHIA: ['VERIFICATION', 'CONSULTATION', 'PHARMACY', 'COMPLETED'],
+  HMO: ['VERIFICATION', 'APPROVAL', 'CONSULTATION', 'COMPLETED'],
+  CASH: ['REGISTRATION', 'PAYMENT', 'CONSULTATION', 'COMPLETED'],
+  EMERGENCY: ['TRIAGE', 'CONSULTATION', 'COMPLETED']
 };
 
 exports.handler = async (event) => {
@@ -46,10 +47,31 @@ exports.handler = async (event) => {
     const pathway = PATHWAYS[patient.patientType] || PATHWAYS.CASH;
     const currentIndex = pathway.indexOf(patient.currentStage);
 
-    if (currentIndex === -1 || currentIndex >= pathway.length - 1) {
+    console.log('Patient: ' + patientId);
+    console.log('Type: ' + patient.patientType);
+    console.log('Current Stage: ' + patient.currentStage);
+    console.log('Pathway: ' + JSON.stringify(pathway));
+    console.log('Current Index: ' + currentIndex);
+
+    if (currentIndex === -1) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'CANNOT_PROGRESS' })
+        body: JSON.stringify({ 
+          error: 'INVALID_STAGE',
+          message: 'Current stage not found in pathway',
+          currentStage: patient.currentStage,
+          pathway: pathway
+        })
+      };
+    }
+
+    if (currentIndex >= pathway.length - 1) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: 'ALREADY_AT_FINAL_STAGE',
+          message: 'Patient has completed pathway'
+        })
       };
     }
 
@@ -72,9 +94,10 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         patientId: patientId,
+        patientType: patient.patientType,
         previousStage: patient.currentStage,
         currentStage: nextStage,
-        message: 'Patient progressed'
+        message: 'Patient progressed successfully'
       })
     };
 
