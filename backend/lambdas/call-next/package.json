@@ -1,7 +1,6 @@
 {
-  "name": "hospital-queue-lambda",
+  "name": "hospital-queue-checkin",
   "version": "1.0.0",
-  "description": "Hospital Queue Lambda Function",
   "main": "index.js",
   "dependencies": {
     "aws-sdk": "^2.1463.0"
