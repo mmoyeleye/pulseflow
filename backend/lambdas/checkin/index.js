@@ -17,16 +17,29 @@ exports.handler = async (event) => {
 
     const patientId = 'pat-' + Date.now();
     const today = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString();
     
+    const PK = 'DEPT#GOPD#DATE#' + today;
+    const SK = 'PATIENT#' + patientId;
+
+    // Determine initial stage based on patient type
+    let currentStage = 'REGISTRATION';
+    if (patientType === 'NHIA' || patientType === 'HMO') {
+      currentStage = 'VERIFICATION';
+    } else if (patientType === 'EMERGENCY') {
+      currentStage = 'TRIAGE';
+    }
+
     const item = {
-      PK: 'DEPT#GOPD#DATE#' + today,
-      SK: 'PATIENT#' + patientId,
+      PK: PK,
+      SK: SK,
       patientId: patientId,
       name: name,
       phone: phone,
       patientType: patientType,
+      currentStage: currentStage,
       status: 'CHECKED_IN',
-      createdAt: new Date().toISOString()
+      createdAt: timestamp
     };
 
     await dynamodb.put({
@@ -39,6 +52,7 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         patientId: patientId,
+        currentStage: currentStage,
         status: 'CHECKED_IN',
         message: 'Patient registered'
       })
