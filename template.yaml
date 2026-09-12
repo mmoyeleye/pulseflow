@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Hospital Queue MVP - Minimal Version
 
@@ -23,7 +23,7 @@ Resources:
   EncountersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'hospital-queue-encounters-${Environment}'
+      TableName: !Sub "hospital-queue-encounters-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -39,7 +39,7 @@ Resources:
   EventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'hospital-queue-events-${Environment}'
+      TableName: !Sub "hospital-queue-events-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: eventId
@@ -51,7 +51,7 @@ Resources:
   AuditEventsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'hospital-queue-audit-${Environment}'
+      TableName: !Sub "hospital-queue-audit-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: auditId
@@ -64,14 +64,18 @@ Resources:
   HospitalQueueAPI:
     Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub 'hospital-queue-api-${Environment}'
+      Name: !Sub 'hospital-queue-api-\${Environment}'
       StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
 
   # Lambda Functions
   CheckInFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-checkin-${Environment}'
+      FunctionName: !Sub "hospital-queue-checkin-${Environment}"
       CodeUri: backend/lambdas/checkin/
       Handler: index.handler
       Policies:
@@ -88,7 +92,7 @@ Resources:
   GetQueueFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-get-queue-${Environment}'
+      FunctionName: !Sub "hospital-queue-get-queue-${Environment}"
       CodeUri: backend/lambdas/get-queue/
       Handler: index.handler
       Policies:
@@ -105,7 +109,7 @@ Resources:
   GetPatientFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-get-patient-${Environment}'
+      FunctionName: !Sub "hospital-queue-get-patient-${Environment}"
       CodeUri: backend/lambdas/get-patient/
       Handler: index.handler
       Policies:
@@ -122,7 +126,7 @@ Resources:
   CallNextFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-call-next-${Environment}'
+      FunctionName: !Sub "hospital-queue-call-next-${Environment}"
       CodeUri: backend/lambdas/call-next/
       Handler: index.handler
       Policies:
@@ -139,7 +143,7 @@ Resources:
   UpdatePatientStatusFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-update-status-${Environment}'
+      FunctionName: !Sub "hospital-queue-update-status-${Environment}"
       CodeUri: backend/lambdas/update-status/
       Handler: index.handler
       Policies:
@@ -158,7 +162,7 @@ Resources:
   SyncEventsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'hospital-queue-sync-events-${Environment}'
+      FunctionName: !Sub "hospital-queue-sync-events-${Environment}"
       CodeUri: backend/lambdas/sync-events/
       Handler: index.handler
       Policies:
@@ -178,7 +182,7 @@ Resources:
 
 Outputs:
   APIEndpoint:
-    Value: !Sub 'https://${HospitalQueueAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Value: !Sub "https://${HospitalQueueAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
   EncountersTable:
     Value: !Ref EncountersTable
   EventsTable:
