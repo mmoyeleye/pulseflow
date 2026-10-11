@@ -3,13 +3,32 @@ const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TABLE = process.env.ENCOUNTERS_TABLE;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Content-Type': 'application/json'
+};
+
 exports.handler = async (event) => {
+  console.log('GetPatient called');
+  
   try {
-    const patientId = event.pathParameters.id;
+    // Handle OPTIONS
+    if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: ''
+      };
+    }
+
+    const patientId = event.pathParameters?.id;
 
     if (!patientId) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'Missing patientId' })
       };
     }
@@ -32,6 +51,7 @@ exports.handler = async (event) => {
     if (!patient) {
       return {
         statusCode: 404,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'PATIENT_NOT_FOUND' })
       };
     }
@@ -41,10 +61,11 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({
         patientId: patientId,
         name: patient.name,
+        phone: patient.phone,
         currentStage: patient.currentStage,
         status: patient.status,
         position: position,
@@ -57,6 +78,7 @@ exports.handler = async (event) => {
     console.error('Error:', error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ error: error.message })
     };
   }
