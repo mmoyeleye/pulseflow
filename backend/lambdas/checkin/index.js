@@ -11,9 +11,11 @@ const corsHeaders = {
 };
 
 exports.handler = async (event) => {
+  console.log('Event received:', JSON.stringify(event));
+  
   try {
-    // Handle OPTIONS request
-    if (event.requestContext.http.method === 'OPTIONS') {
+    // Handle OPTIONS
+    if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
       return {
         statusCode: 200,
         headers: corsHeaders,
@@ -21,14 +23,23 @@ exports.handler = async (event) => {
       };
     }
 
-    const body = JSON.parse(event.body || '{}');
+    // Parse body - handle both string and object
+    let body = event.body;
+    if (typeof body === 'string') {
+      body = JSON.parse(body);
+    }
+    
+    console.log('Parsed body:', JSON.stringify(body));
+
     const { name, phone, patientType } = body;
+    
+    console.log('Fields - name:', name, 'phone:', phone, 'type:', patientType);
     
     if (!name || !phone || !patientType) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ error: 'Missing fields' })
+        body: JSON.stringify({ error: 'Missing fields', received: { name, phone, patientType } })
       };
     }
 
@@ -58,10 +69,14 @@ exports.handler = async (event) => {
       createdAt: timestamp
     };
 
+    console.log('Writing item to DynamoDB:', JSON.stringify(item));
+
     await dynamodb.put({
       TableName: TABLE,
       Item: item
     }).promise();
+
+    console.log('Success - patient registered:', patientId);
 
     return {
       statusCode: 201,
@@ -75,11 +90,17 @@ exports.handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error details:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ 
+        error: error.message,
+        type: error.constructor.name
+      })
     };
   }
 };
