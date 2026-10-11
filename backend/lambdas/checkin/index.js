@@ -3,14 +3,31 @@ const AWS = require('aws-sdk');
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TABLE = process.env.ENCOUNTERS_TABLE;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Content-Type': 'application/json'
+};
+
 exports.handler = async (event) => {
   try {
+    // Handle OPTIONS request
+    if (event.requestContext.http.method === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: ''
+      };
+    }
+
     const body = JSON.parse(event.body || '{}');
     const { name, phone, patientType } = body;
     
     if (!name || !phone || !patientType) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'Missing fields' })
       };
     }
@@ -22,7 +39,6 @@ exports.handler = async (event) => {
     const PK = 'DEPT#GOPD#DATE#' + today;
     const SK = 'PATIENT#' + patientId;
 
-    // Determine initial stage based on patient type
     let currentStage = 'REGISTRATION';
     if (patientType === 'NHIA' || patientType === 'HMO') {
       currentStage = 'VERIFICATION';
@@ -49,7 +65,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 201,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({
         patientId: patientId,
         currentStage: currentStage,
@@ -62,6 +78,7 @@ exports.handler = async (event) => {
     console.error('Error:', error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ error: error.message })
     };
   }

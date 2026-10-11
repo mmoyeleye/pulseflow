@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: "2010-09-09"
+﻿AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Hospital Queue MVP - Minimal Version
 
@@ -64,11 +64,11 @@ Resources:
   HospitalQueueAPI:
     Type: AWS::Serverless::Api
     Properties:
-      Name: !Sub 'hospital-queue-api-\${Environment}'
+      Name: !Sub "hospital-queue-api-${Environment}"
       StageName: !Ref Environment
       Cors:
         AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date'"
         AllowOrigin: "'*'"
 
   # Lambda Functions
