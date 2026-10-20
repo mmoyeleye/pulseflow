@@ -5,15 +5,11 @@ export const checkIn = async (name, phone, patientType) => {
   const response = await fetch(API_URL + '/checkin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: name,
-      phone: phone,
-      patientType: patientType
-    })
+    body: JSON.stringify({ name: name, phone: phone, patientType: patientType })
   });
-
-  if (!response.ok) throw new Error('Check-in failed');
-  return response.json();
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'Check-in failed');
+  return data;
 };
 
 // Get queue
@@ -39,8 +35,9 @@ export const callNextPatient = async (dept) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' }
   });
-  if (!response.ok) throw new Error('Failed to call next');
-  return response.json();
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'Failed to call next patient');
+  return data;
 };
 
 // Update patient status

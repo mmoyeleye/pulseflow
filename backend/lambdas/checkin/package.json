@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "aws-sdk": "^2.1463.0"
+    "aws-sdk": "^2.1693.0",
+    "uuid": "^8.3.2"
   }
 }
