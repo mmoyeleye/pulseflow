@@ -24,6 +24,8 @@ dist-ssr
 *.sw?
 
 
+node_modules/
+*.zip
 .env
 .env.*
 !.env.example
