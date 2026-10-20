@@ -32,7 +32,7 @@ export default function QueueDashboard() {
 
     try {
       const result = await callNextPatient('GOPD');
-      setSuccess('Patient called: ' + result.calledPatient.name);
+      setSuccess('Patient called: ' + result.name);
       // Refresh queue
       setTimeout(fetchQueue, 1000);
     } catch (err) {

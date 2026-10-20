@@ -10,7 +10,7 @@ export default function CheckInForm() {
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
 
-  const handleSubmit = async (e) => {
+   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -20,9 +20,10 @@ export default function CheckInForm() {
       const result = await checkIn(name, phone, patientType);
       setSuccess({
         patientId: result.patientId,
+        cardNumber: result.cardNumber,
+        returningPatient: result.returningPatient,
         message: result.message
       });
-      // Clear form
       setName('');
       setPhone('');
       setPatientType('CASH');
@@ -55,6 +56,8 @@ export default function CheckInForm() {
           <input
             id="phone"
             type="tel"
+            pattern="(\+?234|0)[789][01]\d{8}"
+            title="Enter a valid Nigerian mobile number, e.g. 08012345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="08012345678"
@@ -85,10 +88,12 @@ export default function CheckInForm() {
       
       {success && (
         <div className="success-message">
-          <h2>✓ Check-in Successful!</h2>
+                 <h2>✓ Check-in Successful!</h2>
+          <p>Patient card: <strong>{success.cardNumber}</strong></p>
+          {success.returningPatient && <p>Welcome back. Your existing card has been used.</p>}
           <p>Patient ID: {success.patientId}</p>
           <p>{success.message}</p>
-          <p className="instruction">Save your Patient ID to check your status</p>
+          <p className="instruction">Keep your card number for future visits</p>
         </div>
       )}
     </div>
