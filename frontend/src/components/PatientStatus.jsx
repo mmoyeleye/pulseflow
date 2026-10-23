@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getPatientStatus } from '../services/api';
+import PatientCard from './PatientCard';
 import './PatientStatus.css';
 
 export default function PatientStatus() {
@@ -15,7 +16,7 @@ export default function PatientStatus() {
     setStatus(null);
 
     try {
-      const result = await getPatientStatus(patientId);
+      const result = await getPatientStatus(patientId.trim());
       setStatus(result);
     } catch (err) {
       setError(err.message || 'Patient not found');
@@ -23,6 +24,8 @@ export default function PatientStatus() {
       setLoading(false);
     }
   };
+
+  const waiting = status && status.status === 'CHECKED_IN' && status.position;
 
   return (
     <div className="status-container">
@@ -36,7 +39,7 @@ export default function PatientStatus() {
             type="text"
             value={patientId}
             onChange={(e) => setPatientId(e.target.value)}
-            placeholder="pat-1234567890"
+            placeholder="Paste the Patient ID from check-in"
             required
           />
         </div>
@@ -48,37 +51,26 @@ export default function PatientStatus() {
       {error && <div className="error-message">{error}</div>}
 
       {status && (
-        <div className="status-card">
-          <div className="status-header">
-            <h2>{status.name}</h2>
-            <div className="status-badge">{status.status}</div>
-          </div>
-
-          <div className="status-grid">
-            <div className="status-item">
-              <span className="label">Current Stage:</span>
-              <span className="value">{status.currentStage}</span>
+        <div className="status-result">
+          {waiting ? (
+            <div className="status-position">
+              <span className="status-position__label">Your position</span>
+              <span className="status-position__number">{status.position}</span>
+              <span className="status-position__wait">
+                About {status.estimatedWaitMinutes} minutes to wait
+              </span>
             </div>
-
-            <div className="status-item">
-              <span className="label">Queue Position:</span>
-              <span className="value">{status.position}</span>
+          ) : (
+            <div className="status-position">
+              <span className="status-position__label">Status</span>
+              <span className="status-position__number status-position__number--small">
+                {status.status === 'CALLED' ? 'You have been called' : status.status}
+              </span>
             </div>
+          )}
 
-            <div className="status-item">
-              <span className="label">Estimated Wait:</span>
-              <span className="value">{status.estimatedWaitMinutes} minutes</span>
-            </div>
-
-            <div className="status-item">
-              <span className="label">Phone:</span>
-              <span className="value">{status.phone}</span>
-            </div>
-          </div>
-
-          <div className="status-message">
-            <p>{status.message}</p>
-          </div>
+          <PatientCard patient={status} />
+          {status.message && <p className="status-message">{status.message}</p>}
         </div>
       )}
     </div>
