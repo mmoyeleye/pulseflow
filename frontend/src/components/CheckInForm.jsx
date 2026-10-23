@@ -10,7 +10,7 @@ export default function CheckInForm() {
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
 
-   const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -21,7 +21,6 @@ export default function CheckInForm() {
       setSuccess({
         patientId: result.patientId,
         cardNumber: result.cardNumber,
-        returningPatient: result.returningPatient,
         message: result.message
       });
       setName('');
@@ -37,7 +36,7 @@ export default function CheckInForm() {
   return (
     <div className="checkin-container">
       <h1>Hospital Patient Check-in</h1>
-      
+
       <form onSubmit={handleSubmit} className="checkin-form">
         <div className="form-group">
           <label htmlFor="name">Full Name</label>
@@ -56,11 +55,11 @@ export default function CheckInForm() {
           <input
             id="phone"
             type="tel"
-            pattern="(\+?234|0)[789][01]\d{8}"
-            title="Enter a valid Nigerian mobile number, e.g. 08012345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="08012345678"
+            pattern="(\+?234|0)[789][01]\d{8}"
+            title="Enter a valid Nigerian mobile number, for example 08012345678"
             required
           />
         </div>
@@ -85,15 +84,14 @@ export default function CheckInForm() {
       </form>
 
       {error && <div className="error-message">{error}</div>}
-      
+
       {success && (
         <div className="success-message">
-                 <h2>✓ Check-in Successful!</h2>
-          <p>Patient card: <strong>{success.cardNumber}</strong></p>
-          {success.returningPatient && <p>Welcome back. Your existing card has been used.</p>}
+          <h2>✓ Check-in Successful!</h2>
           <p>Patient ID: {success.patientId}</p>
+          <p>Card number: {success.cardNumber}</p>
           <p>{success.message}</p>
-          <p className="instruction">Keep your card number for future visits</p>
+          <p className="instruction">Save your card number to check your status</p>
         </div>
       )}
     </div>

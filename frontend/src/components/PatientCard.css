@@ -1,0 +1,21 @@
+.patient-card {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.patient-card.is-emergency { border-left-color: #dc2626; background: #fef2f2; }
+.patient-card.is-highlight { box-shadow: 0 0 0 2px #2563eb; }
+.patient-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.patient-card__queue { font-weight: 700; color: #475569; font-size: 14px; }
+.patient-card__tag {
+  background: #dc2626; color: #fff; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: 0.04em;
+}
+.patient-card__name { margin: 0 0 8px; font-size: 18px; }
+.patient-card__meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; margin: 0; }
+.patient-card__meta dt { font-size: 12px; color: #64748b; }
+.patient-card__meta dd { margin: 0; font-size: 14px; }

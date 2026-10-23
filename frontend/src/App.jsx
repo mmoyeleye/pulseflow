@@ -1,24 +1,25 @@
 import { useState } from 'react';
 import Nav from './components/Nav';
 import CheckInForm from './components/CheckInForm';
-import QueueDashboard from './components/QueueDashboard';
+import StaffDashboard from './components/StaffDashboard';
 import PatientStatus from './components/PatientStatus';
+import { QueueProvider } from './context/QueueContext';
 import './App.css';
 
-function App() {
+export default function App() {
   const [currentPage, setCurrentPage] = useState('checkin');
 
   return (
-    <div className="app">
-      <Nav currentPage={currentPage} setCurrentPage={setCurrentPage} />
-      
-      <div className="page-content">
-        {currentPage === 'checkin' && <CheckInForm />}
-        {currentPage === 'queue' && <QueueDashboard />}
-        {currentPage === 'status' && <PatientStatus />}
+    <QueueProvider dept="GOPD">
+      <div className="app">
+        <Nav currentPage={currentPage} setCurrentPage={setCurrentPage} />
+
+        <main className="page-content">
+          {currentPage === 'checkin' && <CheckInForm />}
+          {currentPage === 'queue' && <StaffDashboard />}
+          {currentPage === 'status' && <PatientStatus />}
+        </main>
       </div>
-    </div>
+    </QueueProvider>
   );
 }
-
-export default App;
