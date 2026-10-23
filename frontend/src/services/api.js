@@ -1,53 +1,39 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Check-in: Register patient
-export const checkIn = async (name, phone, patientType) => {
-  const response = await fetch(API_URL + '/checkin', {
-    method: 'POST',
+async function request(path, options = {}) {
+  const response = await fetch(API_URL + path, {
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name, phone: phone, patientType: patientType })
+    ...options
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Check-in failed');
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch (e) {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error((data && data.message) || 'Request failed (' + response.status + ')');
+  }
   return data;
-};
+}
 
-// Get queue
-export const getQueue = async (dept) => {
-  const url = API_URL + '/queue/' + (dept || 'GOPD');
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Failed to get queue');
-  return response.json();
-};
-
-// Get patient status
-export const getPatientStatus = async (patientId) => {
-  const url = API_URL + '/patients/' + patientId;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Patient not found');
-  return response.json();
-};
-
-// Call next patient
-export const callNextPatient = async (dept) => {
-  const url = API_URL + '/queue/' + (dept || 'GOPD') + '/call-next';
-  const response = await fetch(url, {
+export const checkIn = (name, phone, patientType) =>
+  request('/checkin', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    body: JSON.stringify({ name, phone, patientType })
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Failed to call next patient');
-  return data;
-};
 
-// Update patient status
-export const updatePatientStatus = async (patientId, version) => {
-  const url = API_URL + '/patients/' + patientId + '/status';
-  const response = await fetch(url, {
+export const getQueue = (dept = 'GOPD') => request('/queue/' + dept);
+
+export const getPatientStatus = (patientId) => request('/patients/' + patientId);
+
+export const callNextPatient = (dept = 'GOPD') =>
+  request('/queue/' + dept + '/call-next', { method: 'POST' });
+
+export const updatePatientStatus = (patientId, version) =>
+  request('/patients/' + patientId + '/status', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ expectedVersion: version })
   });
-  if (!response.ok) throw new Error('Failed to update status');
-  return response.json();
-};
