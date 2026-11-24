@@ -95,3 +95,18 @@
   border-radius: 6px;
   font-weight: 600;
 }
+
+.with-staff {
+  margin: 16px 0;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.with-staff h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.with-staff .patient-card {
+  width: 100%;
+  box-sizing: border-box;
+}
