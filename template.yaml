@@ -66,9 +66,18 @@ Resources:
     Properties:
       Name: !Sub "hospital-queue-api-${Environment}"
       StageName: !Ref Environment
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingRateLimit: 50
+          ThrottlingBurstLimit: 100
+        - ResourcePath: "/~1checkin"
+          HttpMethod: POST
+          ThrottlingRateLimit: 10
+          ThrottlingBurstLimit: 20
       Cors:
         AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date'"
+        AllowHeaders: "'Content-Type,Authorization'"
         AllowOrigin: "'*'"
 
   # Lambda Functions
@@ -79,8 +88,15 @@ Resources:
       CodeUri: backend/lambdas/checkin/
       Handler: index.handler
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EncountersTable
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Query
+              Resource: !GetAtt EncountersTable.Arn
       Events:
         CheckInAPI:
           Type: Api
@@ -130,8 +146,15 @@ Resources:
       CodeUri: backend/lambdas/call-next/
       Handler: index.handler
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EncountersTable
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt EncountersTable.Arn
+                - !Sub "${EncountersTable.Arn}/index/GSI1"
       Events:
         CallNextAPI:
           Type: Api
@@ -147,10 +170,13 @@ Resources:
       CodeUri: backend/lambdas/update-status/
       Handler: index.handler
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref EncountersTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref AuditEventsTable
+        - Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+              Resource: !GetAtt EncountersTable.Arn
       Events:
         UpdateStatusAPI:
           Type: Api
