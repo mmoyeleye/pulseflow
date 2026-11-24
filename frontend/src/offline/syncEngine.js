@@ -1,5 +1,5 @@
-import { callNextPatient, updatePatientStatus } from '../services/api';
-import { listPending, removeAction } from './queueDb';
+import { callNextPatient, updatePatientStatus } from "../services/api";
+import { listPending, removeAction } from "./queueDb";
 
 let running = false;
 
@@ -15,17 +15,20 @@ export async function syncPending() {
     const pending = await listPending();
     for (const action of pending) {
       try {
-        if (action.type === 'CALL_NEXT') {
-          await callNextPatient(action.dept);
-        } else if (action.type === 'UPDATE_STATUS') {
-          await updatePatientStatus(action.patientId, action.version);
+        let patient = null;
+        if (action.type === "CALL_NEXT") {
+          patient = await callNextPatient(action.dept);
+        } else if (action.type === "UPDATE_STATUS") {
+          await updatePatientStatus(
+            action.patientId,
+            action.version,
+            action.status,
+          );
         }
         await removeAction(action.id);
-        results.push({ action, ok: true });
+        results.push({ action, ok: true, patient });
       } catch (err) {
-        if (isNetworkError(err)) break; // still offline: keep this and everything after it
-        // The server refused it (queue empty, already called, version changed).
-        // Drop it so it doesn't block the queue, and report it.
+        if (isNetworkError(err)) break;
         await removeAction(action.id);
         results.push({ action, ok: false, message: err.message });
       }

@@ -2,8 +2,8 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 async function request(path, options = {}) {
   const response = await fetch(API_URL + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options
+    headers: { "Content-Type": "application/json" },
+    ...options,
   });
 
   let data = null;
@@ -14,26 +14,32 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error((data && data.message) || 'Request failed (' + response.status + ')');
+    const err = new Error(
+      (data && data.message) || "Request failed (" + response.status + ")",
+    );
+    err.status = response.status;
+    err.code = data && data.error;
+    throw err;
   }
   return data;
 }
 
 export const checkIn = (name, phone, patientType) =>
-  request('/checkin', {
-    method: 'POST',
-    body: JSON.stringify({ name, phone, patientType })
+  request("/checkin", {
+    method: "POST",
+    body: JSON.stringify({ name, phone, patientType }),
   });
 
-export const getQueue = (dept = 'GOPD') => request('/queue/' + dept);
+export const getQueue = (dept = "GOPD") => request("/queue/" + dept);
 
-export const getPatientStatus = (patientId) => request('/patients/' + patientId);
+export const getPatientStatus = (patientId) =>
+  request("/patients/" + patientId);
 
-export const callNextPatient = (dept = 'GOPD') =>
-  request('/queue/' + dept + '/call-next', { method: 'POST' });
+export const callNextPatient = (dept = "GOPD") =>
+  request("/queue/" + dept + "/call-next", { method: "POST" });
 
-export const updatePatientStatus = (patientId, version) =>
-  request('/patients/' + patientId + '/status', {
-    method: 'PATCH',
-    body: JSON.stringify({ expectedVersion: version })
+export const updatePatientStatus = (patientId, version, status) =>
+  request("/patients/" + patientId + "/status", {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: version, status }),
   });

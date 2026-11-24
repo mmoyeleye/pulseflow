@@ -1,21 +1,14 @@
-import { useQueue } from "../context/QueueContext";
-import PatientCard from "./PatientCard";
-import "./StaffDashboard.css";
+import { useQueue } from '../context/QueueContext';
+import PatientCard from './PatientCard';
+import './StaffDashboard.css';
 
 export default function StaffDashboard() {
   const {
-    queue,
-    loading,
-    error,
-    lastCalled,
-    lastUpdated,
-    callNext,
-    refresh,
-    isOnline,
-    pendingCount,
-    notice,
+    queue, loading, error, lastCalled, lastUpdated,
+    isOnline, pendingCount, notice,
+    callNext, complete, refresh
   } = useQueue();
-  const emergencies = queue.filter((p) => p.urgency === "EMERGENCY").length;
+  const emergencies = queue.filter((p) => p.urgency === 'EMERGENCY').length;
 
   return (
     <section className="staff">
@@ -23,17 +16,13 @@ export default function StaffDashboard() {
         <div>
           <h1>Staff Dashboard — GOPD</h1>
           <p className="staff__meta">
-            {queue.length} waiting · {emergencies} emergency · updated{" "}
-            {lastUpdated ? lastUpdated.toLocaleTimeString() : "—"}
+            {queue.length} waiting · {emergencies} emergency · updated{' '}
+            {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
           </p>
         </div>
         <div className="staff__actions">
-          <button
-            className="btn btn--primary"
-            onClick={callNext}
-            disabled={loading || queue.length === 0}
-          >
-            {loading ? "Calling…" : "Call next patient"}
+          <button className="btn btn--primary" onClick={callNext} disabled={loading || queue.length === 0}>
+            {loading ? 'Working…' : 'Call next patient'}
           </button>
           <button className="btn" onClick={refresh} disabled={loading}>
             Refresh
@@ -41,23 +30,20 @@ export default function StaffDashboard() {
         </div>
       </header>
 
-      {!isOnline && (
-        <div className="offline-banner">
-          Offline. Showing the last queue we received.
-        </div>
-      )}
-      {pendingCount > 0 && (
-        <div className="notice">{pendingCount} action(s) waiting to sync.</div>
-      )}
+      {!isOnline && <div className="offline-banner">Offline. Showing the last queue we received.</div>}
+      {pendingCount > 0 && <div className="notice">{pendingCount} action(s) waiting to sync.</div>}
       {notice && <div className="notice">{notice}</div>}
+      {error && <div className="error-message">{error}</div>}
 
       {lastCalled && (
-        <div className="notice">
-          Last called: <strong>{lastCalled.name}</strong> (queue #
-          {lastCalled.queueNumber})
+        <div className="with-staff">
+          <h2>With staff now</h2>
+          <PatientCard patient={lastCalled} highlight />
+          <button className="btn btn--primary" onClick={() => complete(lastCalled)} disabled={loading}>
+            Mark consultation completed
+          </button>
         </div>
       )}
-      {error && <div className="error-message">{error}</div>}
 
       {queue.length === 0 ? (
         <div className="empty">No patients waiting</div>

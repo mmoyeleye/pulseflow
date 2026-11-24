@@ -2,110 +2,100 @@ const AWS = require('aws-sdk');
 
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 const TABLE = process.env.ENCOUNTERS_TABLE;
+const DEPT = 'GOPD';
 
-// These must match what check-in Lambda sets!
-const PATHWAYS = {
-  NHIA: ['VERIFICATION', 'CONSULTATION', 'PHARMACY', 'COMPLETED'],
-  HMO: ['VERIFICATION', 'APPROVAL', 'CONSULTATION', 'COMPLETED'],
-  CASH: ['REGISTRATION', 'PAYMENT', 'CONSULTATION', 'COMPLETED'],
-  EMERGENCY: ['TRIAGE', 'CONSULTATION', 'COMPLETED']
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Content-Type': 'application/json'
 };
+
+const respond = (statusCode, body) => ({
+  statusCode,
+  headers: corsHeaders,
+  body: JSON.stringify(body)
+});
+
+// Same UTC date the check-in and queue Lambdas use
+const today = () => new Date().toISOString().split('T')[0];
 
 exports.handler = async (event) => {
   try {
-    const patientId = event.pathParameters.id;
-
+    const patientId = event.pathParameters && event.pathParameters.id;
     if (!patientId) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing patientId' })
-      };
+      return respond(400, { error: 'MISSING_PATIENT_ID', message: 'Patient ID is required' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const PK = 'DEPT#GOPD#DATE#' + today;
+    let body;
+    try {
+      body = JSON.parse(event.body || '{}');
+    } catch (e) {
+      return respond(400, { error: 'INVALID_JSON', message: 'Request body must be valid JSON' });
+    }
 
-    const queryResult = await dynamodb.query({
+    const { expectedVersion, status } = body;
+    if (status !== 'COMPLETED') {
+      return respond(400, { error: 'INVALID_STATUS', message: 'Only COMPLETED is supported here' });
+    }
+    if (typeof expectedVersion !== 'number') {
+      return respond(400, { error: 'MISSING_VERSION', message: 'expectedVersion is required' });
+    }
+
+    const visits = await dynamodb.query({
       TableName: TABLE,
-      KeyConditionExpression: 'PK = :pk',
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
       ExpressionAttributeValues: {
-        ':pk': PK
+        ':pk': `DEPT#${DEPT}#DATE#${today()}`,
+        ':sk': 'PATIENT#'
       }
     }).promise();
 
-    const patient = queryResult.Items.find(function(item) {
-      return item.patientId === patientId;
-    });
-
-    if (!patient) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({ error: 'PATIENT_NOT_FOUND' })
-      };
+    const visit = visits.Items.find(
+      (item) => item.patientId === patientId && item.status === 'CALLED'
+    );
+    if (!visit) {
+      return respond(404, { error: 'PATIENT_NOT_CALLED', message: 'No called visit found for this patient today' });
     }
 
-    const pathway = PATHWAYS[patient.patientType] || PATHWAYS.CASH;
-    const currentIndex = pathway.indexOf(patient.currentStage);
+    try {
+      const result = await dynamodb.update({
+        TableName: TABLE,
+        Key: { PK: visit.PK, SK: visit.SK },
+        UpdateExpression:
+          'SET #status = :completed, currentStage = :completed, lastUpdatedAt = :now, lastUpdatedBy = :by ADD version :one',
+        ConditionExpression: '#status = :called AND version = :expected',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':completed': 'COMPLETED',
+          ':called': 'CALLED',
+          ':expected': expectedVersion,
+          ':now': new Date().toISOString(),
+          ':by': 'STAFF',
+          ':one': 1
+        },
+        ReturnValues: 'ALL_NEW'
+      }).promise();
 
-    console.log('Patient: ' + patientId);
-    console.log('Type: ' + patient.patientType);
-    console.log('Current Stage: ' + patient.currentStage);
-    console.log('Pathway: ' + JSON.stringify(pathway));
-    console.log('Current Index: ' + currentIndex);
-
-    if (currentIndex === -1) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ 
-          error: 'INVALID_STAGE',
-          message: 'Current stage not found in pathway',
-          currentStage: patient.currentStage,
-          pathway: pathway
-        })
-      };
-    }
-
-    if (currentIndex >= pathway.length - 1) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ 
-          error: 'ALREADY_AT_FINAL_STAGE',
-          message: 'Patient has completed pathway'
-        })
-      };
-    }
-
-    const nextStage = pathway[currentIndex + 1];
-
-    await dynamodb.update({
-      TableName: TABLE,
-      Key: {
-        PK: patient.PK,
-        SK: patient.SK
-      },
-      UpdateExpression: 'SET currentStage = :stage',
-      ExpressionAttributeValues: {
-        ':stage': nextStage
+      return respond(200, {
+        success: true,
+        patientId,
+        name: result.Attributes.displayName,
+        status: 'COMPLETED',
+        version: result.Attributes.version,
+        message: `Consultation completed for ${result.Attributes.displayName}`
+      });
+    } catch (err) {
+      if (err.code === 'ConditionalCheckFailedException') {
+        return respond(409, {
+          error: 'VERSION_CONFLICT',
+          message: 'This record changed since it was called. Refresh the queue and try again.'
+        });
       }
-    }).promise();
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        patientId: patientId,
-        patientType: patient.patientType,
-        previousStage: patient.currentStage,
-        currentStage: nextStage,
-        message: 'Patient progressed successfully'
-      })
-    };
-
+      throw err;
+    }
   } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message })
-    };
+    console.error('Error in UpdateStatus Lambda:', error);
+    return respond(500, { error: 'INTERNAL_ERROR', message: 'Could not update status, please try again' });
   }
 };
