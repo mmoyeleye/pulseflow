@@ -120,8 +120,7 @@ The full, longer list — including what the original research PRD called for ve
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | [Architecture & API Reference](docs/GOPD-Architecture-and-API-Reference.docx) | System diagram, every endpoint, every status/error code                       |
 | [Deployment Guide](docs/GOPD-Deployment-Guide.docx)                           | Build/deploy steps and real troubleshooting for every error hit along the way |
-| [User Manual](docs/GOPD-User-Manual.docx)                                     | How-to for reception, clinical staff, and patients                            |
-| [Demo Video Script](docs/GOPD-Demo-Video-Script.docx)                         | A timed ~4.5-minute walkthrough script                                        |
+| [User Manual](docs/GOPD-User-Manual.docx)                                     | How-to for reception, clinical staff, and patients                            
 | [Day 9 Test Report](docs/Day9-Test-Report.docx)                               | Load test results and the defect log from testing                             |
 | [Final Project Report](docs/GOPD-Final-Project-Report.docx)                   | The 14-day build journey, test summary, and known-limitations table           |
 
